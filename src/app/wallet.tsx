@@ -1,12 +1,11 @@
 'use client'
-import { useCallback, useEffect, useState, FC, ReactNode } from 'react';
-import { AccountInfo, GetProgramAccountsResponse, LAMPORTS_PER_SOL, ParsedAccountData, ParsedInstruction, ParsedTransactionWithMeta, PartiallyDecodedInstruction, PublicKey } from "@solana/web3.js";
-import { TOKEN_PROGRAM_ID } from '@solana/spl-token'
-import { NextPage } from "next";
+import { useEffect, useState } from 'react';
+import { AccountInfo, LAMPORTS_PER_SOL, ParsedAccountData, ParsedInstruction, ParsedTransactionWithMeta, PartiallyDecodedInstruction, PublicKey } from "@solana/web3.js";
 import {
     useConnection, useWallet
 } from "@solana/wallet-adapter-react";
 import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
+import { floor } from './utils';
 
 type StakeAccount = {
     pubkey: PublicKey;
@@ -25,8 +24,6 @@ export const Wallet = () => {
 
     const { connection } = useConnection();
     const { publicKey } = useWallet();
-    // const handleClick = useCallback(()=>{
-    // },[])
 
     useEffect(() => {
         if (publicKey && transactionHistory && stakes.length > 0) {
@@ -105,7 +102,7 @@ export const Wallet = () => {
             )
             let rows = transactionHistory.map((item, i) => {
                 if (item === null) return
-                let date = new Date(item.blockTime! * 1000).toLocaleDateString();
+                let date = new Date(item.blockTime! * 1000).toLocaleDateString("ru-RU");
                 let info = item.transaction.message.instructions.filter((instr) => instr.parsed?.type && instr.parsed?.type === "transfer")[0]?.parsed?.info
                 if (!info) return
                 let volume = info?.lamports;
@@ -139,7 +136,7 @@ export const Wallet = () => {
         })
         instruсtions = instruсtions.filter((instr) => (instr.parsed?.type?.includes("createAccount")))
         console.table(instruсtions)
-        setInitStakeInstructionsList(<>{instruсtions.map((item) => <><div key={item.parsed?.info.newAccount}>{item.parsed?.info.newAccount}, {item.parsed.info.lamports / LAMPORTS_PER_SOL}</div><br /></>)}</>)
+        setInitStakeInstructionsList(<>{instruсtions.map((item) => <div key={item.parsed?.info.newAccount}><div>{item.parsed?.info.newAccount}, {item.parsed.info.lamports / LAMPORTS_PER_SOL}</div><br /></div>)}</>)
         setStakesTable((prevState) => {
             return stakes.map((stake) => {
                 let initStake = instruсtions.find((instr) => stake.pubkey.toString() === instr.parsed?.info.newAccount)?.parsed?.info.lamports
@@ -182,20 +179,17 @@ export const Wallet = () => {
                 const epcohStart = Number(item.account.data.parsed?.info.stake.delegation.activationEpoch);
                 const epochCurrent = Number(item.account.rentEpoch);
                 const epochAge = epochCurrent - epcohStart;
-                return <div key={i}>{item.pubkey.toString()}: {item.initStake / LAMPORTS_PER_SOL}, {item.account.lamports / LAMPORTS_PER_SOL}, TR:{((item.account.lamports - item.initStake!) / LAMPORTS_PER_SOL).toPrecision(2)}</div>
+                return <div key={i}>{item.pubkey.toString()}: {floor(item.initStake / LAMPORTS_PER_SOL, 2)}, {floor(item.account.lamports / LAMPORTS_PER_SOL, 2)}, REWARD: {floor((item.account.lamports - item.initStake!) / LAMPORTS_PER_SOL, 2)}</div>
             })}
-            {stakesTable && <>TOTAL STAKE: {total_stake}</>}
+            {stakesTable && <>TOTAL STAKE: {floor(total_stake, 2)} SOL</>}
             <br />
-            {stakesTable && <>TOTAL INIT STAKE: {total_init_stake}</>}
+            {stakesTable && <>TOTAL INIT STAKE: {floor(total_init_stake, 2)} SOL</>}
             <br />
-            {stakesTable && <>TOTAL REWARD: {total_reward}</>}
+            {stakesTable && <>TOTAL REWARD: {floor(total_reward, 2)} SOL</>}
             <br />
-            {stakesTable && <>TOTAL RETURN: {total_return.toPrecision(4)}%</>}
-            <div>table: {transactionTable}</div>
-            <>SUM: {countSum()?.toString()}</>
+            {stakesTable && <>TOTAL RETURN: {floor(total_return, 2)}%</>}
+            <div>Transactions: {transactionTable}</div>
             <br />
-            <>Initial Stakes:</><br />
-            {initStakeInstructionsList}
         </div>
     );
 }
