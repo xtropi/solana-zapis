@@ -57,26 +57,13 @@ export const Wallet = () => {
             info?.lamports && setBalance(info.lamports);
         });
 
-        connection.getParsedProgramAccounts(new PublicKey('Stake11111111111111111111111111111111111111'), {
-            // commitment: 'confirmed',
-            filters: [
-                {
-                    memcmp: {
-                        offset: 44,
-                        bytes: publicKey.toString(), // your pubkey, encoded as a base-58 string
-                    },
-                },
-            ],
-        }).then((res) => {
-            res && setStakes(res);
-            console.log(res)
-        });
 
-        getTransactions(publicKey.toString(), 100)
+        fetchStakes(publicKey.toString())
+        fetchTransactions(publicKey.toString(), 100)
 
     }, [connection, publicKey]);
 
-    async function getTransactions(address, numTx) {
+    async function fetchTransactions(address, numTx) {
         const pubKey = new PublicKey(address);
         //Find recent transactions
         let transactionList = await connection.getSignaturesForAddress(pubKey, { limit: numTx });
@@ -87,6 +74,21 @@ export const Wallet = () => {
         //Update State
         setTransactionHistory(transactionDetails.sort((a, b) => (a?.slot || 0 - (b?.slot || 0))));
         console.log(transactionList, transactionDetails)
+    }
+
+    async function fetchStakes(address) {
+        let programAccounts = await connection.getParsedProgramAccounts(new PublicKey('Stake11111111111111111111111111111111111111'), {
+            // commitment: 'confirmed',
+            filters: [
+                {
+                    memcmp: {
+                        offset: 44,
+                        bytes: address, // your pubkey, encoded as a base-58 string
+                    },
+                },
+            ],
+        })
+        setStakes(programAccounts);
     }
 
     function buildTransactionTable() {
@@ -130,18 +132,17 @@ export const Wallet = () => {
 
     function buildInitStakeInstructionsList() {
         if (!transactionHistory) return <></>
-        let instrustions: (ParsedInstruction | PartiallyDecodedInstruction)[] = []
+        let instruсtions: (ParsedInstruction | PartiallyDecodedInstruction)[] = []
         transactionHistory?.map((item, i) => {
             if (item === null) return
-            let instructions = item.transaction.message.instructions
-            instructions.map((instr) => {
-                if (instr.parsed?.type === "createAccount") instrustions.push(instr)
-            })
+            instruсtions.push(...item.transaction.message.instructions)
         })
-        setInitStakeInstructionsList(<>{instrustions.map((item) => <><div key={item.parsed?.info.newAccount}>{item.parsed?.info.newAccount}, {item.parsed.info.lamports / LAMPORTS_PER_SOL}</div><br /></>)}</>)
+        instruсtions = instruсtions.filter((instr) => (instr.parsed?.type?.includes("createAccount")))
+        console.table(instruсtions)
+        setInitStakeInstructionsList(<>{instruсtions.map((item) => <><div key={item.parsed?.info.newAccount}>{item.parsed?.info.newAccount}, {item.parsed.info.lamports / LAMPORTS_PER_SOL}</div><br /></>)}</>)
         setStakesTable((prevState) => {
             return stakes.map((stake) => {
-                let initStake = instrustions.find((instr) => stake.pubkey.toString() === instr.parsed?.info.newAccount)?.parsed?.info.lamports
+                let initStake = instruсtions.find((instr) => stake.pubkey.toString() === instr.parsed?.info.newAccount)?.parsed?.info.lamports
                 return {
                     ...stake,
                     initStake
@@ -162,6 +163,17 @@ export const Wallet = () => {
         }, 0) / LAMPORTS_PER_SOL
     }
 
+    const total_stake = stakesTable.reduce((acc, item, i) => {
+        return acc = acc + item.account.lamports
+    }, 0) / LAMPORTS_PER_SOL
+    const total_init_stake = stakesTable.reduce((acc, item, i) => {
+        return acc = acc + (item.initStake || item.account.lamports)
+    }, 0) / LAMPORTS_PER_SOL
+    const total_reward = stakesTable.reduce((acc, item, i) => {
+        return acc = acc + (item.account.lamports - (item.initStake || item.account.lamports))
+    }, 0) / LAMPORTS_PER_SOL
+    const total_return = total_reward / total_init_stake * 100;
+
     return (
         <div>
             <WalletMultiButton />
@@ -172,20 +184,13 @@ export const Wallet = () => {
                 const epochAge = epochCurrent - epcohStart;
                 return <div key={i}>{item.pubkey.toString()}: {item.initStake / LAMPORTS_PER_SOL}, {item.account.lamports / LAMPORTS_PER_SOL}, TR:{((item.account.lamports - item.initStake!) / LAMPORTS_PER_SOL).toPrecision(2)}</div>
             })}
-            {stakesTable && <>TOTAL STAKE: {stakesTable.reduce((acc, item, i) => {
-                return acc = acc + item.account.lamports
-            }, 0) / LAMPORTS_PER_SOL}</>
-            }
-            <br/>
-            {stakesTable && <>TOTAL INIT STAKE: {stakesTable.reduce((acc, item, i) => {
-                return acc = acc + (item.initStake||item.account.lamports)
-            }, 0) / LAMPORTS_PER_SOL}</>
-            }
-            <br/>
-            {stakesTable && <>TOTAL REWARD: {stakesTable.reduce((acc, item, i) => {
-                return acc = acc + (item.account.lamports - (item.initStake||item.account.lamports))
-            }, 0) / LAMPORTS_PER_SOL}</>
-            }
+            {stakesTable && <>TOTAL STAKE: {total_stake}</>}
+            <br />
+            {stakesTable && <>TOTAL INIT STAKE: {total_init_stake}</>}
+            <br />
+            {stakesTable && <>TOTAL REWARD: {total_reward}</>}
+            <br />
+            {stakesTable && <>TOTAL RETURN: {total_return.toPrecision(4)}%</>}
             <div>table: {transactionTable}</div>
             <>SUM: {countSum()?.toString()}</>
             <br />
