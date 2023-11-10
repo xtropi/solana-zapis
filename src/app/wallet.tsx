@@ -70,7 +70,7 @@ export const Wallet = () => {
         let transactionDetails = await connection.getParsedTransactions(signatureList, { maxSupportedTransactionVersion: 0 });
         //Update State
         setTransactionHistory(transactionDetails.sort((a, b) => (a?.slot || 0 - (b?.slot || 0))));
-        console.log(transactionList, transactionDetails)
+        console.table(transactionDetails)
     }
 
     async function fetchStakes(address) {
@@ -135,7 +135,7 @@ export const Wallet = () => {
             instruсtions.push(...item.transaction.message.instructions)
         })
         instruсtions = instruсtions.filter((instr) => (instr.parsed?.type?.includes("createAccount")))
-        console.table(instruсtions)
+        console.table(instruсtions.map((item)=>({...item.parsed!.info, type: item.parsed!.type})))
         setInitStakeInstructionsList(<>{instruсtions.map((item) => <div key={item.parsed?.info.newAccount}><div>{item.parsed?.info.newAccount}, {item.parsed.info.lamports / LAMPORTS_PER_SOL}</div><br /></div>)}</>)
         setStakesTable((prevState) => {
             return stakes.map((stake) => {
