@@ -32,7 +32,7 @@ export default function Home() {
     <ConnectionProvider endpoint={endpoint2}>
       <WalletProvider wallets={[wallet]}>
         <WalletModalProvider>
-          <main className={styles.main}>
+          <main>
             <WalletMultiButtonDynamic />
           </main>
         </WalletModalProvider>
