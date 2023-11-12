@@ -29,6 +29,7 @@ import {
   Grid,
   Container,
 } from "@mui/material";
+import { TransactionsTable, TransactionsTableItem } from "./components/TransactionsTable";
 
 type StakeAccount = {
   pubkey: PublicKey;
@@ -43,7 +44,9 @@ export const Wallet = () => {
   const [transactionHistory, setTransactionHistory] = useState<
     (ParsedTransactionWithMeta | null)[] | undefined
   >();
-  const [transactionTable, setTransactionTable] = useState<JSX.Element>();
+  const [transactionTableData, setTransactionTableData] = useState<
+    TransactionsTableItem[]
+  >([]);
   const [initStakeInstructionsList, setInitStakeInstructionsList] =
     useState<JSX.Element>();
 
@@ -55,12 +58,6 @@ export const Wallet = () => {
       buildInitStakeInstructionsList();
     }
   }, [stakes]);
-
-  useEffect(() => {
-    if (publicKey && transactionHistory) {
-      buildTransactionTable();
-    }
-  }, [publicKey, connection, transactionHistory]);
 
   useEffect(() => {
     if (!connection || !publicKey) {
@@ -99,10 +96,12 @@ export const Wallet = () => {
       { maxSupportedTransactionVersion: 0 }
     );
     //Update State
-    setTransactionHistory(
+    setTransactionHistory(transactionDetails);
+    const preparedTransactions = prepareTransactionsTableData(
       transactionDetails.sort((a, b) => a?.slot || 0 - (b?.slot || 0))
     );
-    console.table(transactionDetails);
+    setTransactionTableData(preparedTransactions);
+    console.table(preparedTransactions);
   }
 
   async function fetchStakes(address) {
@@ -123,48 +122,35 @@ export const Wallet = () => {
     setStakes(programAccounts);
   }
 
-  function buildTransactionTable() {
-    if (transactionHistory && transactionHistory.length !== 0) {
-      let header = (
-        <TableHead>
-          <TableRow>
-            <TableCell>Volume</TableCell>
-            <TableCell>Slot</TableCell>
-            <TableCell>Date</TableCell>
-            <TableCell>Result</TableCell>
-          </TableRow>
-        </TableHead>
-      );
-      let rows = transactionHistory.map((item, i) => {
-        if (item === null) return;
-        let date = new Date(item.blockTime! * 1000).toLocaleDateString("ru-RU");
+  function prepareTransactionsTableData(
+    transactions: (ParsedTransactionWithMeta | null)[]
+  ): TransactionsTableItem[] {
+    if (!transactions || transactions.length === 0) return [];
+    const f: ParsedTransactionWithMeta[] = transactions
+      .map((item) => {
         let info = item.transaction.message.instructions.filter(
           (instr) => instr.parsed?.type && instr.parsed?.type === "transfer"
         )[0]?.parsed?.info;
-        if (!info) return;
-        let volume = info?.lamports;
-        if (info.destination !== publicKey?.toString()) volume = volume * -1;
-        return (
-          <TableRow key={i + 1}>
-            <TableCell>{(volume / LAMPORTS_PER_SOL).toString()}</TableCell>
-            <TableCell>{item.slot.toLocaleString("en-US")}</TableCell>
-            <TableCell>{date}</TableCell>
-            <TableCell>{item.meta!.err ? "Failed" : "Success"}</TableCell>
-          </TableRow>
-        );
+        if (!info) return null;
+        return item;
+      })
+      .filter((element) => {
+        return (element !== null &&
+          element !== undefined) as unknown as ParsedTransactionWithMeta;
       });
-
-      setTransactionTable(
-        <TableContainer component={Paper}>
-          <Table>
-            {header}
-            <TableBody>{rows}</TableBody>
-          </Table>
-        </TableContainer>
-      );
-    } else {
-      setTransactionTable(undefined);
-    }
+    return f.map((item) => {
+      let info = item.transaction.message.instructions.filter(
+        (instr) => instr.parsed?.type && instr.parsed?.type === "transfer"
+      )[0]?.parsed?.info;
+      let volume = info?.lamports || Number(info?.amount) || undefined;
+      if (info.destination !== publicKey?.toString()) volume = volume * -1;
+      return {
+        volume: volume,
+        slot: item.slot,
+        blockTime: item.blockTime || undefined,
+        status: item.meta!.err ? "Failed" : "Success",
+      };
+    });
   }
 
   function buildInitStakeInstructionsList() {
@@ -269,7 +255,6 @@ export const Wallet = () => {
 
       <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
         <Grid container spacing={3}>
-          {/* Chart */}
           <Grid item xs={12} md={8} lg={9}>
             <Paper
               sx={{
@@ -278,6 +263,14 @@ export const Wallet = () => {
                 flexDirection: "column",
               }}
             >
+              <Typography
+                component="h2"
+                variant="h6"
+                color="primary"
+                gutterBottom
+              >
+                Stakes:
+              </Typography>
               {stakesTable &&
                 stakesTable.map((item, i) => {
                   const epcohStart = Number(
@@ -289,7 +282,7 @@ export const Wallet = () => {
                   return (
                     <div key={i}>
                       {item.pubkey.toString()}:{" "}
-                      {floor(item.initStake / LAMPORTS_PER_SOL, 2)},{" "}
+                      {floor(item.initStake! / LAMPORTS_PER_SOL, 2)},{" "}
                       {floor(item.account.lamports / LAMPORTS_PER_SOL, 2)},
                       REWARD:{" "}
                       {floor(
@@ -336,8 +329,9 @@ export const Wallet = () => {
                 color="primary"
                 gutterBottom
               >
-                Transactions: {transactionTable}
+                Transactions:
               </Typography>
+              <TransactionsTable data={transactionTableData} />
             </Paper>
           </Grid>
         </Grid>
