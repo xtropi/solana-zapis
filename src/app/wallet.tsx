@@ -34,6 +34,7 @@ import {
   TransactionsTableItem,
 } from "./components/TransactionsTable";
 import { StakesTable, StakesTableItem } from "./components/StakesTable";
+import { StakesChart, StakesChartData } from "./components/StakesChart";
 
 type StakeAccount = {
   pubkey: PublicKey;
@@ -172,6 +173,19 @@ export const Wallet = () => {
         blockTime: item.blockTime,
       };
     });
+  }
+
+  function prepareStakesChartData(value: any): StakesChartData[] {
+    return [
+        { epoch: 0, value: 10 },
+        { epoch: 1, value: 20 },
+        { epoch: 100, value: 50 },
+        { epoch: 200, value: 80 },
+        { epoch: 300, value: 316 },
+        { epoch: 400, value: 380 },
+        { epoch: 500, value: 452 },
+        { epoch: 600, value: 526 },
+      ]
   }
 
   function buildInitStakeInstructionsList() {
@@ -345,6 +359,19 @@ export const Wallet = () => {
                 Transactions:
               </Typography>
               <TransactionsTable data={transactionTableData} />
+            </Paper>
+          </Grid>
+          <Grid item xs={12}>
+            <Paper sx={{ p: 2, display: "flex", flexDirection: "column" }}>
+              <Typography
+                component="h2"
+                variant="h5"
+                color="primary"
+                gutterBottom
+              >
+                Transactions:
+              </Typography>
+              <StakesChart chartData={[prepareStakesChartData(123)]} />
             </Paper>
           </Grid>
         </Grid>
