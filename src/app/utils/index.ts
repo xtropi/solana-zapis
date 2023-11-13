@@ -8,7 +8,8 @@ export function round(number: number, precision: number) {
             "e-" + precision);
 }
 
-export function floor(number: number, precision: number) {
+export function floor(number: number | undefined, precision: number) {
+    if (!number) return
     if (precision < 0) {
         let factor = Math.pow(10, precision);
         return Math.round(number * factor) / factor;

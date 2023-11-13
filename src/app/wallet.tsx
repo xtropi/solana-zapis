@@ -30,6 +30,7 @@ import {
   Container,
 } from "@mui/material";
 import { TransactionsTable, TransactionsTableItem } from "./components/TransactionsTable";
+import { StakesTable, StakesTableItem } from "./components/StakesTable";
 
 type StakeAccount = {
   pubkey: PublicKey;
@@ -39,16 +40,14 @@ type StakeAccount = {
 
 export const Wallet = () => {
   const [balance, setBalance] = useState(0);
-  const [stakes, setStakes] = useState<Array<StakeAccount>>([]);
-  const [stakesTable, setStakesTable] = useState<Array<StakeAccount>>([]);
+  const [stakes, setStakes] = useState<StakeAccount[]>([]);
+  const [stakesTable, setStakesTable] = useState<StakesTableItem[]>([]);
   const [transactionHistory, setTransactionHistory] = useState<
     (ParsedTransactionWithMeta | null)[] | undefined
   >();
   const [transactionTableData, setTransactionTableData] = useState<
     TransactionsTableItem[]
   >([]);
-  const [initStakeInstructionsList, setInitStakeInstructionsList] =
-    useState<JSX.Element>();
 
   const { connection } = useConnection();
   const { publicKey } = useWallet();
@@ -153,12 +152,34 @@ export const Wallet = () => {
     });
   }
 
+  function prepareStakesTableData(
+    stakes: any[]
+  ): StakesTableItem[] {
+    if (!stakes || stakes.length === 0) return [];
+    return stakes.map((item) => {
+          const activationEpoch = Number(
+            item.account.data.parsed?.info.stake.delegation
+              .activationEpoch
+          );
+          const rentEpoch = Number(item.account.rentEpoch);
+          return ({
+            pubkey: item.pubkey.toString(),
+            initStake: item.initStake,
+            stake: item.account.lamports,
+            reward: item.account.lamports - item.initStake!,
+            activationEpoch: activationEpoch,
+            rentEpoch: rentEpoch,
+            blockTime: item.blockTime
+            });
+        })
+  }
+
   function buildInitStakeInstructionsList() {
-    if (!transactionHistory) return <></>;
-    let instruсtions: (ParsedInstruction | PartiallyDecodedInstruction)[] = [];
-    transactionHistory?.map((item, i) => {
+    if (!transactionHistory) return;
+    let instruсtions:any = [];
+    transactionHistory?.map((item) => {
       if (item === null) return;
-      instruсtions.push(...item.transaction.message.instructions);
+      instruсtions.push(...item.transaction.message.instructions.map((instruction)=>({...instruction, blockTime: item.blockTime})));
     });
     instruсtions = instruсtions.filter((instr) =>
       instr.parsed?.type?.includes("createAccount")
@@ -169,30 +190,19 @@ export const Wallet = () => {
         type: item.parsed!.type,
       }))
     );
-    setInitStakeInstructionsList(
-      <>
-        {instruсtions.map((item) => (
-          <div key={item.parsed?.info.newAccount}>
-            <div>
-              {item.parsed?.info.newAccount},{" "}
-              {item.parsed.info.lamports / LAMPORTS_PER_SOL}
-            </div>
-            <br />
-          </div>
-        ))}
-      </>
-    );
-    setStakesTable((prevState) => {
-      return stakes.map((stake) => {
-        let initStake = instruсtions.find(
+
+    setStakesTable(prepareStakesTableData(stakes.map((stake) => {
+        const selected = instruсtions.find(
           (instr) => stake.pubkey.toString() === instr.parsed?.info.newAccount
-        )?.parsed?.info.lamports;
+        );
+        const initStake = selected?.parsed?.info.lamports
+        const blockTime = selected?.blockTime!
         return {
           ...stake,
           initStake,
+          blockTime
         };
-      });
-    });
+      })));
   }
 
   function countSum() {
@@ -213,17 +223,17 @@ export const Wallet = () => {
 
   const total_stake =
     stakesTable.reduce((acc, item, i) => {
-      return (acc = acc + item.account.lamports);
+      return (acc = acc + item.stake);
     }, 0) / LAMPORTS_PER_SOL;
   const total_init_stake =
     stakesTable.reduce((acc, item, i) => {
-      return (acc = acc + (item.initStake || item.account.lamports));
+      return (acc = acc + (item.initStake || item.stake));
     }, 0) / LAMPORTS_PER_SOL;
   const total_reward =
     stakesTable.reduce((acc, item, i) => {
       return (acc =
         acc +
-        (item.account.lamports - (item.initStake || item.account.lamports)));
+        (item.stake - (item.initStake || item.stake)));
     }, 0) / LAMPORTS_PER_SOL;
   const total_return = (total_reward / total_init_stake) * 100;
 
@@ -240,13 +250,13 @@ export const Wallet = () => {
           >
             {/* <MenuIcon /> */}
           </IconButton>
-          <Typography
+          {/* <Typography
             variant="h6"
             component="div"
             sx={{ flexGrow: 1, display: { xs: "none", sm: "block" } }}
           >
             MUI
-          </Typography>
+          </Typography> */}
           <Box sx={{ display: { xs: "none", sm: "block" } }}>
             <WalletMultiButton />
           </Box>
@@ -265,46 +275,24 @@ export const Wallet = () => {
             >
               <Typography
                 component="h2"
-                variant="h6"
+                variant="h5"
                 color="primary"
                 gutterBottom
               >
                 Stakes:
               </Typography>
-              {stakesTable &&
-                stakesTable.map((item, i) => {
-                  const epcohStart = Number(
-                    item.account.data.parsed?.info.stake.delegation
-                      .activationEpoch
-                  );
-                  const epochCurrent = Number(item.account.rentEpoch);
-                  const epochAge = epochCurrent - epcohStart;
-                  return (
-                    <div key={i}>
-                      {item.pubkey.toString()}:{" "}
-                      {floor(item.initStake! / LAMPORTS_PER_SOL, 2)},{" "}
-                      {floor(item.account.lamports / LAMPORTS_PER_SOL, 2)},
-                      REWARD:{" "}
-                      {floor(
-                        (item.account.lamports - item.initStake!) /
-                          LAMPORTS_PER_SOL,
-                        2
-                      )}
-                    </div>
-                  );
-                })}
-              {stakesTable && <>TOTAL STAKE: {floor(total_stake, 2)} SOL</>}
+              <StakesTable data={stakesTable} />
+              {stakesTable && <Typography >TOTAL STAKE: {floor(total_stake, 2)} SOL</Typography>}
               <br />
               {stakesTable && (
-                <>TOTAL INIT STAKE: {floor(total_init_stake, 2)} SOL</>
+                <Typography >TOTAL INIT STAKE: {floor(total_init_stake, 2)} SOL</Typography>
               )}
               <br />
-              {stakesTable && <>TOTAL REWARD: {floor(total_reward, 2)} SOL</>}
+              {stakesTable && <Typography >TOTAL REWARD: {floor(total_reward, 2)} SOL</Typography>}
               <br />
-              {stakesTable && <>TOTAL RETURN: {floor(total_return, 2)}%</>}
+              {stakesTable && <Typography >TOTAL RETURN: {floor(total_return, 2)}%</Typography>}
             </Paper>
           </Grid>
-          {/* Recent Deposits */}
           <Grid item xs={12} md={4} lg={3}>
             <Paper
               sx={{
@@ -315,17 +303,16 @@ export const Wallet = () => {
             >
               <div>
                 {publicKey && balance
-                  ? `Balance: ${balance / LAMPORTS_PER_SOL} SOL`
+                  ? `Balance: ${floor(balance / LAMPORTS_PER_SOL, 2)} SOL`
                   : ""}
               </div>
             </Paper>
           </Grid>
-          {/* Recent Orders */}
           <Grid item xs={12}>
             <Paper sx={{ p: 2, display: "flex", flexDirection: "column" }}>
               <Typography
                 component="h2"
-                variant="h6"
+                variant="h5"
                 color="primary"
                 gutterBottom
               >
