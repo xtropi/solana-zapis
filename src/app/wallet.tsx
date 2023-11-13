@@ -371,7 +371,7 @@ export const Wallet = () => {
               >
                 Transactions:
               </Typography>
-              <StakesChart chartData={[prepareStakesChartData(123)]} />
+              <StakesChart data={prepareStakesChartData(123)} />
             </Paper>
           </Grid>
         </Grid>
