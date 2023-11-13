@@ -28,9 +28,9 @@ export type StakesTableItem = {
   initStake?: number;
   stake?: number;
   reward?: number;
-  activationEpoch?: number,
-  rentEpoch?: number,
-  blockTime?: number,
+  activationEpoch?: number;
+  rentEpoch?: number;
+  blockTime?: number;
 };
 
 export const StakesTable: FC<StakesTableProps> = ({ data }) => {
@@ -59,8 +59,8 @@ export const StakesTable: FC<StakesTableProps> = ({ data }) => {
 
   if (!data || data.length === 0) return <></>;
   return (
-    <TableContainer component={Paper} sx={{mb: 2}}>
-      <Table >
+    <TableContainer component={Paper} sx={{ mb: 2 }}>
+      <Table>
         <TableHead>
           <TableRow>
             <TableCell sx={{ fontWeight: "bold", fontSize: "1rem" }}>
@@ -84,41 +84,43 @@ export const StakesTable: FC<StakesTableProps> = ({ data }) => {
           </TableRow>
         </TableHead>
         <TableBody>
-          {data.sort((a, b) => b?.blockTime - a?.blockTime).map((item) => {
-            const visibleLengthSize = 4;
-            let date = new Date(item.blockTime! * 1000).toLocaleDateString(
-              "ru-RU"
-            );
-            let duration = new Date().getTime() - item.blockTime! * 1000;
-            return (
-              <TableRow key={item.pubkey}>
-                <TableCell
-                  aria-describedby={"StakesTableClipboardPopover"}
-                  onClick={getPubkeyClickHandler(item.pubkey)}
-                >
-                  {item.pubkey?.slice(0, visibleLengthSize)} ...{" "}
-                  {item.pubkey?.slice(
-                    item.pubkey?.length - visibleLengthSize,
-                    item.pubkey?.length
-                  )}
-                </TableCell>
-                <TableCell>
-                  {floor(duration / DAY, 0)}
-                </TableCell>
-                <TableCell>
-                  {floor(item.initStake / LAMPORTS_PER_SOL, 2)}
-                </TableCell>
-                <TableCell>{floor(item.stake / LAMPORTS_PER_SOL, 2)}</TableCell>
-                <TableCell>
-                  {floor(item.reward / LAMPORTS_PER_SOL, 2)}
-                  ({floor((item.reward / item.initStake) * 100, 2)}%)
-                </TableCell>
-                <TableCell>
-                  {date}
-                </TableCell>
-              </TableRow>
-            );
-          })}
+          {data
+            .sort((a, b) => b?.blockTime - a?.blockTime)
+            .map((item) => {
+              const visibleLengthSize = 4;
+              let date = new Date(item.blockTime! * 1000).toLocaleDateString(
+                "ru-RU"
+              );
+              let duration = new Date().getTime() - item.blockTime! * 1000;
+              return (
+                <TableRow key={item.pubkey}>
+                  <TableCell
+                    aria-describedby={"StakesTableClipboardPopover"}
+                    onClick={getPubkeyClickHandler(item.pubkey)}
+                  >
+                    {item.pubkey?.slice(0, visibleLengthSize)} ...{" "}
+                    {item.pubkey?.slice(
+                      item.pubkey?.length - visibleLengthSize,
+                      item.pubkey?.length
+                    )}
+                  </TableCell>
+                  <TableCell>{floor(duration / DAY, 0)}</TableCell>
+                  <TableCell>
+                    {floor(item.initStake / LAMPORTS_PER_SOL, 2)}
+                  </TableCell>
+                  <TableCell>
+                    <Typography color="primary">
+                      {floor(item.stake / LAMPORTS_PER_SOL, 2)}
+                    </Typography>
+                  </TableCell>
+                  <TableCell>
+                    {floor(item.reward / LAMPORTS_PER_SOL, 2)}(
+                    {floor((item.reward / item.initStake) * 100, 2)}%)
+                  </TableCell>
+                  <TableCell>{date}</TableCell>
+                </TableRow>
+              );
+            })}
         </TableBody>
       </Table>
       <Popover

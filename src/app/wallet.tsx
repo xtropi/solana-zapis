@@ -29,7 +29,10 @@ import {
   Grid,
   Container,
 } from "@mui/material";
-import { TransactionsTable, TransactionsTableItem } from "./components/TransactionsTable";
+import {
+  TransactionsTable,
+  TransactionsTableItem,
+} from "./components/TransactionsTable";
 import { StakesTable, StakesTableItem } from "./components/StakesTable";
 
 type StakeAccount = {
@@ -152,34 +155,36 @@ export const Wallet = () => {
     });
   }
 
-  function prepareStakesTableData(
-    stakes: any[]
-  ): StakesTableItem[] {
+  function prepareStakesTableData(stakes: any[]): StakesTableItem[] {
     if (!stakes || stakes.length === 0) return [];
     return stakes.map((item) => {
-          const activationEpoch = Number(
-            item.account.data.parsed?.info.stake.delegation
-              .activationEpoch
-          );
-          const rentEpoch = Number(item.account.rentEpoch);
-          return ({
-            pubkey: item.pubkey.toString(),
-            initStake: item.initStake,
-            stake: item.account.lamports,
-            reward: item.account.lamports - item.initStake!,
-            activationEpoch: activationEpoch,
-            rentEpoch: rentEpoch,
-            blockTime: item.blockTime
-            });
-        })
+      const activationEpoch = Number(
+        item.account.data.parsed?.info.stake.delegation.activationEpoch
+      );
+      const rentEpoch = Number(item.account.rentEpoch);
+      return {
+        pubkey: item.pubkey.toString(),
+        initStake: item.initStake,
+        stake: item.account.lamports,
+        reward: item.account.lamports - item.initStake!,
+        activationEpoch: activationEpoch,
+        rentEpoch: rentEpoch,
+        blockTime: item.blockTime,
+      };
+    });
   }
 
   function buildInitStakeInstructionsList() {
     if (!transactionHistory) return;
-    let instruсtions:any = [];
+    let instruсtions: any = [];
     transactionHistory?.map((item) => {
       if (item === null) return;
-      instruсtions.push(...item.transaction.message.instructions.map((instruction)=>({...instruction, blockTime: item.blockTime})));
+      instruсtions.push(
+        ...item.transaction.message.instructions.map((instruction) => ({
+          ...instruction,
+          blockTime: item.blockTime,
+        }))
+      );
     });
     instruсtions = instruсtions.filter((instr) =>
       instr.parsed?.type?.includes("createAccount")
@@ -191,18 +196,22 @@ export const Wallet = () => {
       }))
     );
 
-    setStakesTable(prepareStakesTableData(stakes.map((stake) => {
-        const selected = instruсtions.find(
-          (instr) => stake.pubkey.toString() === instr.parsed?.info.newAccount
-        );
-        const initStake = selected?.parsed?.info.lamports
-        const blockTime = selected?.blockTime!
-        return {
-          ...stake,
-          initStake,
-          blockTime
-        };
-      })));
+    setStakesTable(
+      prepareStakesTableData(
+        stakes.map((stake) => {
+          const selected = instruсtions.find(
+            (instr) => stake.pubkey.toString() === instr.parsed?.info.newAccount
+          );
+          const initStake = selected?.parsed?.info.lamports;
+          const blockTime = selected?.blockTime!;
+          return {
+            ...stake,
+            initStake,
+            blockTime,
+          };
+        })
+      )
+    );
   }
 
   function countSum() {
@@ -231,9 +240,7 @@ export const Wallet = () => {
     }, 0) / LAMPORTS_PER_SOL;
   const total_reward =
     stakesTable.reduce((acc, item, i) => {
-      return (acc =
-        acc +
-        (item.stake - (item.initStake || item.stake)));
+      return (acc = acc + (item.stake - (item.initStake || item.stake)));
     }, 0) / LAMPORTS_PER_SOL;
   const total_return = (total_reward / total_init_stake) * 100;
 
@@ -282,15 +289,6 @@ export const Wallet = () => {
                 Stakes:
               </Typography>
               <StakesTable data={stakesTable} />
-              {stakesTable && <Typography >TOTAL STAKE: {floor(total_stake, 2)} SOL</Typography>}
-              <br />
-              {stakesTable && (
-                <Typography >TOTAL INIT STAKE: {floor(total_init_stake, 2)} SOL</Typography>
-              )}
-              <br />
-              {stakesTable && <Typography >TOTAL REWARD: {floor(total_reward, 2)} SOL</Typography>}
-              <br />
-              {stakesTable && <Typography >TOTAL RETURN: {floor(total_return, 2)}%</Typography>}
             </Paper>
           </Grid>
           <Grid item xs={12} md={4} lg={3}>
@@ -301,11 +299,39 @@ export const Wallet = () => {
                 flexDirection: "column",
               }}
             >
-              <div>
+              <Typography
+                component="h2"
+                variant="h6"
+                color="primary"
+                gutterBottom
+              >
+                Balance:{" "}
                 {publicKey && balance
-                  ? `Balance: ${floor(balance / LAMPORTS_PER_SOL, 2)} SOL`
+                  ? ` ${floor(balance / LAMPORTS_PER_SOL, 2)} SOL`
                   : ""}
-              </div>
+              </Typography>
+
+              {stakesTable && (
+                <Typography
+                  component="h2"
+                  variant="h6"
+                  color="primary"
+                  gutterBottom
+                >
+                  Stake: {floor(total_stake, 2)} SOL
+                </Typography>
+              )}
+              {stakesTable && (
+                <Typography>
+                  Initial Stake: {floor(total_init_stake, 2)} SOL
+                </Typography>
+              )}
+              {stakesTable && (
+                <Typography>Reward: {floor(total_reward, 2)} SOL</Typography>
+              )}
+              {stakesTable && (
+                <Typography>TOTAL RETURN: {floor(total_return, 2)}%</Typography>
+              )}
             </Paper>
           </Grid>
           <Grid item xs={12}>
