@@ -1,23 +1,16 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   AccountInfo,
+  InflationReward,
   LAMPORTS_PER_SOL,
   ParsedAccountData,
-  ParsedInstruction,
   ParsedTransactionWithMeta,
-  PartiallyDecodedInstruction,
   PublicKey,
 } from "@solana/web3.js";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
 import { floor } from "./utils";
-import Table from "@mui/material/Table";
-import TableBody from "@mui/material/TableBody";
-import TableCell from "@mui/material/TableCell";
-import TableContainer from "@mui/material/TableContainer";
-import TableHead from "@mui/material/TableHead";
-import TableRow from "@mui/material/TableRow";
 import Paper from "@mui/material/Paper";
 import {
   AppBar,
@@ -25,7 +18,6 @@ import {
   IconButton,
   Typography,
   Box,
-  Button,
   Grid,
   Container,
 } from "@mui/material";
@@ -46,6 +38,10 @@ export const Wallet = () => {
   const [balance, setBalance] = useState(0);
   const [stakes, setStakes] = useState<StakeAccount[]>([]);
   const [stakesTable, setStakesTable] = useState<StakesTableItem[]>([]);
+  const [currentEpoch, setCurrentEpoch] = useState<number>(0);
+  const [stakeRewards, setStakeRewards] = useState<
+    Record<PublicKey, (InflationReward | null)[]>
+  >({});
   const [transactionHistory, setTransactionHistory] = useState<
     (ParsedTransactionWithMeta | null)[] | undefined
   >();
@@ -55,33 +51,6 @@ export const Wallet = () => {
 
   const { connection } = useConnection();
   const { publicKey } = useWallet();
-
-  useEffect(() => {
-    if (publicKey && transactionHistory && stakes.length > 0) {
-      buildInitStakeInstructionsList();
-    }
-  }, [stakes]);
-
-  useEffect(() => {
-    if (!connection || !publicKey) {
-      return;
-    }
-
-    connection.onAccountChange(
-      publicKey,
-      (updatedAccountInfo) => {
-        setBalance(updatedAccountInfo.lamports / LAMPORTS_PER_SOL);
-      },
-      "confirmed"
-    );
-
-    connection.getAccountInfo(publicKey).then((info) => {
-      info?.lamports && setBalance(info.lamports);
-    });
-
-    fetchStakes(publicKey.toString());
-    fetchTransactions(publicKey.toString(), 100);
-  }, [connection, publicKey]);
 
   async function fetchTransactions(address, numTx) {
     const pubKey = new PublicKey(address);
@@ -106,6 +75,32 @@ export const Wallet = () => {
     setTransactionTableData(preparedTransactions);
     console.table(preparedTransactions);
   }
+
+  const fetchStakeRewards = useCallback(
+    async (addresses: PublicKey[], epochStart: number, epochEnd: number, step: number) => {
+      for (let i = epochEnd; i > epochStart; i=i-step) {
+        connection.getInflationReward(addresses, i).then((epochReward) => {
+          epochReward
+            .map((item, k) => {
+              setStakeRewards((prevState) => {
+                if (prevState[addresses[k].toString()]){
+                    return ({
+                        ...prevState,
+                        [addresses[k].toString()]: [item && item, ...prevState[addresses[k].toString()]],
+                    })
+                } else {
+                    return ({
+                        ...prevState,
+                        [addresses[k].toString()]: [item && item],
+                    })
+                }
+            })
+            });
+        });
+      }
+    },
+    [connection]
+  );
 
   async function fetchStakes(address) {
     let programAccounts = await connection.getParsedProgramAccounts(
@@ -175,17 +170,17 @@ export const Wallet = () => {
     });
   }
 
-  function prepareStakesChartData(value: any): StakesChartData[] {
-    return [
-        { epoch: 0, value: 10 },
-        { epoch: 1, value: 20 },
-        { epoch: 100, value: 50 },
-        { epoch: 200, value: 80 },
-        { epoch: 300, value: 316 },
-        { epoch: 400, value: 380 },
-        { epoch: 500, value: 452 },
-        { epoch: 600, value: 526 },
-      ]
+  function prepareStakesChartData(
+    rewards: (InflationReward | null)[]
+  ): StakesChartData[] {
+    return rewards
+      .filter(
+        (item): item is InflationReward => item !== null && item !== undefined
+      )
+      .map((item) => ({
+        epoch: item.epoch,
+        value: floor(item.postBalance / LAMPORTS_PER_SOL, 4)!,
+      }));
   }
 
   function buildInitStakeInstructionsList() {
@@ -258,6 +253,52 @@ export const Wallet = () => {
     }, 0) / LAMPORTS_PER_SOL;
   const total_return = (total_reward / total_init_stake) * 100;
 
+  useEffect(() => {
+    if (publicKey && transactionHistory && stakes.length > 0) {
+      buildInitStakeInstructionsList();
+    }
+  }, [stakes]);
+
+  useEffect(() => {
+    if (publicKey && currentEpoch && stakes.length > 0) {
+      fetchStakeRewards(
+        stakesTable.map((item) => new PublicKey(item.pubkey!)),
+        currentEpoch - 200,
+        currentEpoch - 1,
+        5
+      );
+    }
+  }, [stakesTable]);
+
+  useEffect(() => {
+    if (!connection || !publicKey) {
+      return;
+    }
+
+    connection.getEpochInfo().then((res) => {
+      setCurrentEpoch(res.epoch);
+    });
+
+    connection.onAccountChange(
+      publicKey,
+      (updatedAccountInfo) => {
+        setBalance(updatedAccountInfo.lamports / LAMPORTS_PER_SOL);
+      },
+      "confirmed"
+    );
+
+    connection.getAccountInfo(publicKey).then((info) => {
+      info?.lamports && setBalance(info.lamports);
+    });
+
+    fetchStakes(publicKey.toString());
+    fetchTransactions(publicKey.toString(), 100);
+  }, [connection, publicKey]);
+
+  useEffect(() => {
+    console.log(stakeRewards);
+  }, [stakeRewards]);
+
   return (
     <div>
       <AppBar component="nav" position="static">
@@ -313,27 +354,31 @@ export const Wallet = () => {
                 flexDirection: "column",
               }}
             >
-              <Typography
-                component="h2"
-                variant="h6"
-                color="primary"
-                gutterBottom
-              >
-                Balance:{" "}
-                {publicKey && balance
-                  ? ` ${floor(balance / LAMPORTS_PER_SOL, 2)} SOL`
-                  : ""}
-              </Typography>
+              <Box sx={{ mb: 2 }}>
+                <Typography component="h2" variant="h5" color="primary">
+                  Balance:
+                </Typography>
+                <Typography component="p" variant="h4">
+                  {publicKey && balance
+                    ? ` ${floor(balance / LAMPORTS_PER_SOL, 2)} SOL`
+                    : ""}
+                </Typography>
+              </Box>
 
               {stakesTable && (
-                <Typography
-                  component="h2"
-                  variant="h6"
-                  color="primary"
-                  gutterBottom
-                >
-                  Stake: {floor(total_stake, 2)} SOL
-                </Typography>
+                <Box sx={{ mb: 2 }}>
+                  <Typography
+                    component="h2"
+                    variant="h5"
+                    color="primary"
+                    gutterBottom
+                  >
+                    Stake:
+                  </Typography>
+                  <Typography component="p" variant="h4">
+                    {floor(total_stake, 2)} SOL
+                  </Typography>
+                </Box>
               )}
               {stakesTable && (
                 <Typography>
@@ -361,7 +406,7 @@ export const Wallet = () => {
               <TransactionsTable data={transactionTableData} />
             </Paper>
           </Grid>
-          <Grid item xs={12}>
+          {/* <Grid item xs={12}>
             <Paper sx={{ p: 2, display: "flex", flexDirection: "column" }}>
               <Typography
                 component="h2"
@@ -369,11 +414,18 @@ export const Wallet = () => {
                 color="primary"
                 gutterBottom
               >
-                Transactions:
+                Chart:
               </Typography>
-              <StakesChart data={prepareStakesChartData(123)} />
+              {Object.keys(stakeRewards).map((item)=>(
+                <StakesChart
+                    key={item.toString()}
+                  data={prepareStakesChartData(
+                    stakeRewards[item.toString()]
+                  )}
+                />
+              ))}
             </Paper>
-          </Grid>
+          </Grid> */}
         </Grid>
       </Container>
 

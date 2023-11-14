@@ -1,7 +1,6 @@
-import {
-  LineChart,
-} from "@mui/x-charts/LineChart";
-import { FC } from "react";
+import { LineChart } from "@mui/x-charts/LineChart";
+import React from "react";
+import { FC, Fragment } from "react";
 
 export type StakesChartProps = {
   data: StakesChartData[];
@@ -23,25 +22,28 @@ const dataset: StakesChartData[] = [
 ];
 export const StakesChart: FC<StakesChartProps> = ({ data }) => {
   return (
-    <LineChart
-      width={500}
-      height={300}
-      series={[
-        {
-          dataKey: "value",
-          label: "SOL",
-        },
-      ]}
-      xAxis={[
-        {
-          dataKey: "epoch",
-          label: "epoch",
-          valueFormatter: (v) => v.toString() + " epoch",
-          min: 0,
-          max: 600,
-        },
-      ]}
-      dataset={data}
-    />
+    <Fragment>
+      <LineChart
+        disableAxisListener
+        disableLineItemHighlight
+        width={500}
+        height={300}
+        series={[
+          {
+            dataKey: "value",
+            label: "SOL",
+          },
+        ]}
+        xAxis={[
+          {
+            dataKey: "epoch",
+            label: "epoch",
+            valueFormatter: (v) => v.toString() + " epoch",
+            hideTooltip: true
+          },
+        ]}
+        dataset={data}
+      />
+    </Fragment>
   );
 };
